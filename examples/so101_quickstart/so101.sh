@@ -20,13 +20,14 @@ FOLLOWER_PORT="${FOLLOWER_PORT:-/dev/ttyACM0}"
 LEADER_PORT="${LEADER_PORT:-/dev/ttyACM1}"
 FOLLOWER_ID="${FOLLOWER_ID:-my_follower}"
 LEADER_ID="${LEADER_ID:-my_leader}"
-DEFAULT_CAMERAS="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}"
+DEFAULT_CAMERAS="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30, fourcc: \"MJPG\"}}"
 CAMERAS="${CAMERAS:-${DEFAULT_CAMERAS}}"
 TASK_NAME="${TASK_NAME:-my_task}"
 TASK_DESC="${TASK_DESC:-Pick up the cube and place it in the box}"
 NUM_EPISODES="${NUM_EPISODES:-50}"
 EPISODE_TIME_S="${EPISODE_TIME_S:-30}"
 RESET_TIME_S="${RESET_TIME_S:-10}"
+PUSH_TO_HUB="${PUSH_TO_HUB:-true}"
 POLICY_TYPE="${POLICY_TYPE:-act}"
 DEVICE="${DEVICE:-cuda}"
 BATCH_SIZE="${BATCH_SIZE:-8}"
@@ -70,16 +71,17 @@ Usage: $0 <step> [extra lerobot flags...]
 
 Hardware (once per arm):
   find-port       Detect the USB port of an arm (run once per arm)
+  perms           Give the current user access to both serial ports (Linux, uses sudo)
   find-cameras    List OpenCV cameras and save a test frame from each
   setup-motors    Write motor ids/baudrate on follower then leader
   calibrate       Calibrate follower then leader
-  setup           setup-motors + calibrate
+  setup           setup-motors + calibrate (pre-assembled kits can skip setup-motors and run calibrate)
   teleop          Teleoperate with cameras shown (sanity check)
 
 Data:
   record          Record \$NUM_EPISODES episodes to \$HF_USER/\$TASK_NAME and push to the Hub
                   (keys: right arrow = next, left arrow = redo, ESC = stop and upload)
-  resume          Continue recording into the existing dataset
+  resume          Continue recording into the existing dataset (\$NUM_EPISODES = how many more to add)
   replay [EP]     Replay episode EP (default 0) on the follower
   view            Print the dataset visualizer link
 
@@ -99,6 +101,10 @@ step="${1:-}"
 case "${step}" in
   find-port)
     run lerobot-find-port
+    ;;
+  perms)
+    echo "+ sudo chmod 666 ${FOLLOWER_PORT} ${LEADER_PORT}" >&2
+    sudo chmod 666 "${FOLLOWER_PORT}" "${LEADER_PORT}"
     ;;
   find-cameras)
     run lerobot-find-cameras opencv
@@ -128,6 +134,7 @@ case "${step}" in
       --dataset.num_episodes="${NUM_EPISODES}" \
       --dataset.episode_time_s="${EPISODE_TIME_S}" \
       --dataset.reset_time_s="${RESET_TIME_S}" \
+      --dataset.push_to_hub="${PUSH_TO_HUB}" \
       --display_data=true ${extra[@]+"${extra[@]}"} "$@"
     ;;
   replay)
