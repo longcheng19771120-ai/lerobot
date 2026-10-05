@@ -18,7 +18,7 @@ cp so101.env.example so101.env      # edit ports, cameras, task name/description
 ```
 
 To fine-tune [FLUX 3 Action](../../docs/source/flux3.mdx) instead of ACT, record with two cameras named
-`scene` and `wrist`, install `uv sync --locked --extra feetech --extra core_scripts --extra training --extra flux3` plus a torch-matched NATTEN
+`scene` and `wrist`, install `uv sync --locked --extra feetech --extra core_scripts --extra training --extra flux3 --extra peft --extra diffusion` plus a torch-matched NATTEN
 wheel, then run `POLICY_TYPE=flux3 ./so101.sh train` and `POLICY_TYPE=flux3 ./so101.sh eval`.
 
 Any extra flags are forwarded to the underlying `lerobot-*` command, e.g. `./so101.sh train --steps=20000`.
