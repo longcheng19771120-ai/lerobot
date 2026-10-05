@@ -19,7 +19,8 @@ cp so101.env.example so101.env      # edit ports, cameras, task name/description
 
 To fine-tune [FLUX 3 Action](../../docs/source/flux3.mdx) instead of ACT, record with two cameras named
 `scene` and `wrist`, install `uv sync --locked --extra feetech --extra core_scripts --extra training --extra flux3 --extra peft --extra diffusion` plus a torch-matched NATTEN
-wheel, then run `POLICY_TYPE=flux3 ./so101.sh train` and `POLICY_TYPE=flux3 ./so101.sh eval`.
+wheel, then run `POLICY_TYPE=flux3 ./so101.sh train` and `POLICY_TYPE=flux3 ./so101.sh eval`. FLUX 3 needs an
+NVIDIA GPU: NATTEN has no MPS backend, so it does not run on Apple silicon (record on the Mac, train elsewhere).
 
 Any extra flags are forwarded to the underlying `lerobot-*` command, e.g. `./so101.sh train --steps=20000`.
 Shell variables override the config file, e.g. `TASK_NAME=stack_cubes ./so101.sh record`.
