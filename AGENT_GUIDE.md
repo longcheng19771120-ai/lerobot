@@ -158,8 +158,10 @@ lerobot-train \
 
 **4.10 Evaluate on the real robot** — compare success rate to a teleoperated baseline.
 
+> Tip: [`examples/so101_quickstart/so101.sh`](./examples/so101_quickstart/) wraps §4.2–4.10 behind one config file (`./so101.sh setup | record | train | eval`).
+
 ```bash
-lerobot-record \
+lerobot-rollout --strategy.type=episodic \
   --robot.type=so101_follower --robot.port=<FOLLOWER_PORT> --robot.id=my_follower \
   --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
   --dataset.repo_id=${HF_USER}/eval_my_task \
@@ -342,10 +344,10 @@ Two flavors of evaluation:
 
 ### 8.1 Real-robot eval (SO-101, etc.)
 
-Reuse `lerobot-record` with `--policy.path` to run the trained policy on-robot and save the run as an eval dataset. Convention: prefix the dataset with `eval_`.
+Use `lerobot-rollout --strategy.type=episodic` with `--policy.path` to run the trained policy on-robot and save the run as an eval dataset (`lerobot-record` is data collection only and rejects `eval_` datasets). Convention: prefix the dataset with `eval_`.
 
 ```bash
-lerobot-record \
+lerobot-rollout --strategy.type=episodic \
   --robot.type=so101_follower --robot.port=<FOLLOWER_PORT> --robot.id=my_follower \
   --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
   --dataset.repo_id=${HF_USER}/eval_my_task \
