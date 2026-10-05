@@ -16,8 +16,15 @@ fi
 
 ROBOT_TYPE="${ROBOT_TYPE:-so101_follower}"
 TELEOP_TYPE="${TELEOP_TYPE:-so101_leader}"
-FOLLOWER_PORT="${FOLLOWER_PORT:-/dev/ttyACM0}"
-LEADER_PORT="${LEADER_PORT:-/dev/ttyACM1}"
+# macOS names ports /dev/tty.usbmodem<serial>, so there is no safe default there: run find-port.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  FOLLOWER_PORT="${FOLLOWER_PORT:-}"
+  LEADER_PORT="${LEADER_PORT:-}"
+  DEVICE="${DEVICE:-mps}"
+else
+  FOLLOWER_PORT="${FOLLOWER_PORT:-/dev/ttyACM0}"
+  LEADER_PORT="${LEADER_PORT:-/dev/ttyACM1}"
+fi
 FOLLOWER_ID="${FOLLOWER_ID:-my_follower}"
 LEADER_ID="${LEADER_ID:-my_leader}"
 DEFAULT_CAMERAS="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30, fourcc: \"MJPG\"}}"
@@ -30,6 +37,13 @@ RESET_TIME_S="${RESET_TIME_S:-10}"
 PUSH_TO_HUB="${PUSH_TO_HUB:-true}"
 POLICY_TYPE="${POLICY_TYPE:-act}"
 DEVICE="${DEVICE:-cuda}"
+
+require_ports() {
+  if [[ -z "${FOLLOWER_PORT}" || -z "${LEADER_PORT}" ]]; then
+    echo "FOLLOWER_PORT / LEADER_PORT are not set. Run \`$0 find-port\` once per arm and put them in ${CONFIG_FILE}." >&2
+    exit 1
+  fi
+}
 BATCH_SIZE="${BATCH_SIZE:-8}"
 STEPS="${STEPS:-50000}"
 WANDB="${WANDB:-false}"
@@ -103,6 +117,10 @@ USAGE
 
 step="${1:-}"
 [[ $# -gt 0 ]] && shift
+
+case "${step}" in
+  perms | setup-motors | calibrate | setup | teleop | record | resume | replay | eval) require_ports ;;
+esac
 
 case "${step}" in
   find-port)
