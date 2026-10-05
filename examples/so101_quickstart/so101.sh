@@ -34,6 +34,8 @@ BATCH_SIZE="${BATCH_SIZE:-8}"
 STEPS="${STEPS:-50000}"
 WANDB="${WANDB:-false}"
 EVAL_EPISODES="${EVAL_EPISODES:-10}"
+FLUX3_BASE="${FLUX3_BASE:-black-forest-labs/flux-3-action-so101}"
+RENAME_MAP="${RENAME_MAP:-}"
 
 # Use `uv run` inside a source checkout, plain commands otherwise (pip install).
 if [[ -z "${RUN+x}" ]]; then
@@ -64,6 +66,9 @@ hf_user() {
 robot_args=(--robot.type="${ROBOT_TYPE}" --robot.port="${FOLLOWER_PORT}" --robot.id="${FOLLOWER_ID}")
 teleop_args=(--teleop.type="${TELEOP_TYPE}" --teleop.port="${LEADER_PORT}" --teleop.id="${LEADER_ID}")
 camera_args=(--robot.cameras="${CAMERAS}")
+rename_args=()
+[[ -n "${RENAME_MAP}" ]] && rename_args+=(--rename_map="${RENAME_MAP}")
+train_dir="outputs/train/${POLICY_TYPE}_${TASK_NAME}"
 
 usage() {
   cat <<USAGE
@@ -87,9 +92,10 @@ Data:
 
 Policy:
   train           Train \$POLICY_TYPE on the dataset and push it to \$HF_USER/\${POLICY_TYPE}_\$TASK_NAME
+                  (POLICY_TYPE=flux3: LoRA fine-tune of \$FLUX3_BASE with examples/flux3/lora.json, kept local)
   resume-train    Resume the last training run from its checkpoint
   eval [PATH]     Run the policy on the robot for \$EVAL_EPISODES episodes, saved as eval_\$TASK_NAME
-                  (PATH defaults to the Hub policy; pass a local pretrained_model dir to test a checkpoint)
+                  (PATH defaults to the Hub policy, or the last local checkpoint for flux3; pass a local pretrained_model dir to test a checkpoint)
 
 Config: ${CONFIG_FILE}
 USAGE
@@ -148,25 +154,43 @@ case "${step}" in
     ;;
   train)
     user="$(hf_user)"
-    run lerobot-train \
-      --dataset.repo_id="${user}/${TASK_NAME}" \
-      --policy.type="${POLICY_TYPE}" \
-      --policy.device="${DEVICE}" \
-      --policy.repo_id="${user}/${POLICY_TYPE}_${TASK_NAME}" \
-      --output_dir="outputs/train/${POLICY_TYPE}_${TASK_NAME}" \
-      --job_name="${POLICY_TYPE}_${TASK_NAME}" \
-      --batch_size="${BATCH_SIZE}" \
-      --steps="${STEPS}" \
-      --wandb.enable="${WANDB}" "$@"
+    if [[ "${POLICY_TYPE}" == "flux3" ]]; then
+      # LoRA fine-tune of the SO-101 FLUX 3 Action checkpoint with the repo's recipe (batch 2, accumulation 4,
+      # 10k steps). Adapters stay local (the recipe sets push_to_hub=false).
+      run lerobot-train \
+        --config_path="${SCRIPT_DIR}/../flux3/lora.json" \
+        --policy.path="${FLUX3_BASE}" \
+        --policy.device="${DEVICE}" \
+        --dataset.repo_id="${user}/${TASK_NAME}" \
+        --output_dir="${train_dir}" \
+        --job_name="${POLICY_TYPE}_${TASK_NAME}" \
+        --wandb.enable="${WANDB}" ${rename_args[@]+"${rename_args[@]}"} "$@"
+    else
+      run lerobot-train \
+        --dataset.repo_id="${user}/${TASK_NAME}" \
+        --policy.type="${POLICY_TYPE}" \
+        --policy.device="${DEVICE}" \
+        --policy.repo_id="${user}/${POLICY_TYPE}_${TASK_NAME}" \
+        --output_dir="${train_dir}" \
+        --job_name="${POLICY_TYPE}_${TASK_NAME}" \
+        --batch_size="${BATCH_SIZE}" \
+        --steps="${STEPS}" \
+        --wandb.enable="${WANDB}" "$@"
+    fi
     ;;
   resume-train)
     run lerobot-train \
-      --config_path="outputs/train/${POLICY_TYPE}_${TASK_NAME}/checkpoints/last/pretrained_model/train_config.json" \
+      --config_path="${train_dir}/checkpoints/last/pretrained_model/train_config.json" \
       --resume=true "$@"
     ;;
   eval)
     user="$(hf_user)"
-    policy_path="${1:-${user}/${POLICY_TYPE}_${TASK_NAME}}"
+    if [[ "${POLICY_TYPE}" == "flux3" ]]; then
+      default_policy="${train_dir}/checkpoints/last/pretrained_model"
+    else
+      default_policy="${user}/${POLICY_TYPE}_${TASK_NAME}"
+    fi
+    policy_path="${1:-${default_policy}}"
     [[ $# -gt 0 ]] && shift
     run lerobot-rollout --strategy.type=episodic \
       --policy.path="${policy_path}" \
@@ -176,7 +200,7 @@ case "${step}" in
       --dataset.num_episodes="${EVAL_EPISODES}" \
       --dataset.episode_time_s="${EPISODE_TIME_S}" \
       --dataset.reset_time_s="${RESET_TIME_S}" \
-      --display_data=true "$@"
+      --display_data=true ${rename_args[@]+"${rename_args[@]}"} "$@"
     ;;
   "" | -h | --help | help)
     usage
