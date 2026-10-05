@@ -118,6 +118,12 @@ USAGE
 step="${1:-}"
 [[ $# -gt 0 ]] && shift
 
+# FLUX 3's Video VAE runs on NATTEN, whose kernels (including the flex-attention fallback) reject MPS tensors.
+if [[ "${POLICY_TYPE}" == "flux3" && "${DEVICE}" == "mps" && ("${step}" == "train" || "${step}" == "eval") ]]; then
+  echo "FLUX 3 does not run on Apple MPS (NATTEN has no MPS backend). Use an NVIDIA GPU (DEVICE=cuda), e.g. a cloud GPU or HF Jobs." >&2
+  exit 1
+fi
+
 case "${step}" in
   perms | setup-motors | calibrate | setup | teleop | record | resume | replay | eval) require_ports ;;
 esac
